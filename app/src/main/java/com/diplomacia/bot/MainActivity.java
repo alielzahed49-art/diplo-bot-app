@@ -70,8 +70,8 @@ public class MainActivity extends AppCompatActivity {
                 conn.setReadTimeout(10000);
 
                 // Send form data
-                String body = "username=" + URLEncoder.encode(username, "UTF-8") +
-                              "&password=" + URLEncoder.encode(password, "UTF-8");
+                String body = "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}";
+                conn.setRequestProperty("Content-Type", "application/json");
                 conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
                 conn.setRequestProperty("Content-Length", String.valueOf(body.length()));
                 conn.setInstanceFollowRedirects(false);
