@@ -1,6 +1,8 @@
 package com.diplomacia.bot;
 
 import android.webkit.CookieManager;
+import java.net.URL;
+import java.net.HttpURLConnection;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.graphics.Bitmap;
