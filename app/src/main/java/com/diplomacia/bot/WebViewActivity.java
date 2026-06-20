@@ -1,4 +1,4 @@
-package com.diplomacia.bot;
+package com.yourdiplomicabot;
 
 import android.webkit.CookieManager;
 import java.net.URL;
