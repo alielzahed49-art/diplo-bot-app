@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.diplomacia.bot'
+    namespace 'com.yourdiplomicabot'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.diplomacia.bot"
+        applicationId "com.yourdiplomicabot"
         minSdk 21
         targetSdk 34
         versionCode 1
