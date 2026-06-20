@@ -1,5 +1,6 @@
 package com.diplomacia.bot;
 
+import android.webkit.CookieManager;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -14,7 +15,6 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import org.json.JSONObject;
 import java.io.*;
-import java.net.*;
 
 public class WebViewActivity extends AppCompatActivity {
 
