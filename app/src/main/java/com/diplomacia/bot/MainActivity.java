@@ -1,4 +1,4 @@
-package com.diplomacia.bot;
+package com.yourdiplomicabot;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
