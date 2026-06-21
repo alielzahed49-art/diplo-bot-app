@@ -61,45 +61,50 @@ public class MainActivity extends AppCompatActivity {
 
         new Thread(() -> {
             try {
-                // Login to bot
-                URL loginUrl = new URL(url + "/login");
-                HttpURLConnection conn = (HttpURLConnection) loginUrl.openConnection();
+                java.net.URL loginUrl = new java.net.URL(url + "/login");
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) loginUrl.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setDoOutput(true);
                 conn.setConnectTimeout(10000);
                 conn.setReadTimeout(10000);
-
-                // Send form data
-                String body = "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}";
                 conn.setRequestProperty("Content-Type", "application/json");
-                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-                conn.setRequestProperty("Content-Length", String.valueOf(body.length()));
                 conn.setInstanceFollowRedirects(false);
 
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(body.getBytes("UTF-8"));
+                String body = "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}";
+                byte[] bodyBytes = body.getBytes("UTF-8");
+                conn.setRequestProperty("Content-Length", String.valueOf(bodyBytes.length));
+
+                try (java.io.OutputStream os = conn.getOutputStream()) {
+                    os.write(bodyBytes);
                 }
 
                 int code = conn.getResponseCode();
-                // Get session cookie
-                String cookies = conn.getHeaderField("Set-Cookie");
+
+                // Read response body
+                java.io.InputStream is = (code >= 200 && code < 400) 
+                    ? conn.getInputStream() 
+                    : conn.getErrorStream();
+                java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(is, "UTF-8"));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) sb.append(line);
+                String responseText = sb.toString();
+
+                // Extract session cookie
                 String sessionToken = "";
-                if (cookies != null) {
-                    for (String c : cookies.split(";")) {
-                        if (c.trim().startsWith("session=")) {
-                            sessionToken = c.trim().substring(8);
-                            break;
-                        }
+                for (String header : conn.getHeaderFields().getOrDefault("Set-Cookie", 
+                        new java.util.ArrayList<>())) {
+                    if (header.startsWith("session=")) {
+                        sessionToken = header.split(";")[0].substring(8);
+                        break;
                     }
                 }
 
-                // Check if login succeeded (redirect to / means success)
-                String location = conn.getHeaderField("Location");
-                boolean success = (code == 302 && location != null && !location.contains("login")) ||
-                                  code == 200;
+                // Parse JSON response
+                boolean ok = responseText.contains("\"ok\":true") || responseText.contains("\"ok\": true");
 
-                if (success && !sessionToken.isEmpty()) {
-                    // Save session
+                if (ok && !sessionToken.isEmpty()) {
                     SharedPreferences prefs = getSharedPreferences("diplo", MODE_PRIVATE);
                     prefs.edit().putString("bot_url", url)
                                 .putString("session_token", sessionToken)
@@ -108,11 +113,29 @@ public class MainActivity extends AppCompatActivity {
 
                     final String finalToken = sessionToken;
                     runOnUiThread(() -> openSlotChooser(url, finalToken));
-                } else {
+                } else if (ok && sessionToken.isEmpty()) {
+                    // Try to get cookies another way
                     runOnUiThread(() -> {
                         pbLoading.setVisibility(View.GONE);
                         btnLogin.setEnabled(true);
-                        tvError.setText("❌ خطأ في تسجيل الدخول — تأكد من الاسم وكلمة السر");
+                        tvError.setText("❌ فشل استخراج الـ session — جرب تاني");
+                        tvError.setVisibility(View.VISIBLE);
+                    });
+                } else {
+                    String errMsg = "❌ خطأ في تسجيل الدخول";
+                    if (responseText.contains("error")) {
+                        try {
+                            int start = responseText.indexOf("\"error\":\"") + 9;
+                            int end = responseText.indexOf("\"", start);
+                            if (start > 9 && end > start)
+                                errMsg = "❌ " + responseText.substring(start, end);
+                        } catch (Exception ignored) {}
+                    }
+                    final String finalErr = errMsg;
+                    runOnUiThread(() -> {
+                        pbLoading.setVisibility(View.GONE);
+                        btnLogin.setEnabled(true);
+                        tvError.setText(finalErr);
                         tvError.setVisibility(View.VISIBLE);
                     });
                 }
