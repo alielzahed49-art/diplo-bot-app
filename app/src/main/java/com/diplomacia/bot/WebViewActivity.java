@@ -21,6 +21,7 @@ public class WebViewActivity extends AppCompatActivity {
     private WebView webView;
     private ProgressBar progressBar;
     private TextView tvStatus;
+    private Button btnExtract;
     private String botUrl, sessionToken;
     private int slot;
     private boolean tokenSaved = false;
@@ -28,6 +29,13 @@ public class WebViewActivity extends AppCompatActivity {
     private static final String INJECT_JS = 
         "(function(){" +
         "if(window.__d)return;window.__d=true;" +
+        "var keys = Object.keys(localStorage);" +
+        "for(var i=0;i<keys.length;i++){" +
+        "  var k=keys[i]; var v=localStorage.getItem(k);" +
+        "  if(v && v.length>30 && (v.startsWith('eyJ') || k.toLowerCase().includes('token'))) {" +
+        "    Android.onData(v);" +
+        "  }" +
+        "}" +
         "var token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('jwt');" +
         "if(token) Android.onData(token);" +
         "})();";
@@ -45,19 +53,25 @@ public class WebViewActivity extends AppCompatActivity {
         webView = findViewById(R.id.webview);
         progressBar = findViewById(R.id.progress);
         tvStatus = findViewById(R.id.tv_status);
+        btnExtract = findViewById(R.id.btn_extract); // أضف الزرار في الـ layout
+
+        btnExtract.setOnClickListener(v -> extractTokenManually());
 
         setupWebView();
         webView.loadUrl("https://diplomacia.com.tr");
+    }
+
+    private void extractTokenManually() {
+        webView.evaluateJavascript(INJECT_JS, null);
+        tvStatus.setText("جاري استخراج التوكن...");
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (webView != null) {
-                webView.evaluateJavascript(INJECT_JS, null);
-            }
-        }, 4000);
+            if (webView != null) webView.evaluateJavascript(INJECT_JS, null);
+        }, 5000);
     }
 
     private void setupWebView() {
@@ -79,17 +93,6 @@ public class WebViewActivity extends AppCompatActivity {
                     webView.evaluateJavascript(INJECT_JS, null);
                 }
             }
-
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
-                String url = req.getUrl().toString();
-                if (url.startsWith("https://accounts.google.com") || url.startsWith("https://oauth2.googleapis.com")) {
-                    CustomTabsIntent customTabsIntent = new CustomTabsIntent.Builder().build();
-                    customTabsIntent.launchUrl(WebViewActivity.this, req.getUrl());
-                    return true;
-                }
-                return false;
-            }
         });
     }
 
@@ -100,6 +103,7 @@ public class WebViewActivity extends AppCompatActivity {
             String token = extractToken(text);
             if (token != null) {
                 tokenSaved = true;
+                runOnUiThread(() -> tvStatus.setText("✅ التوكن: " + token.substring(0, 30) + "..."));
                 sendTokenToBot(token);
             }
         }
@@ -111,7 +115,6 @@ public class WebViewActivity extends AppCompatActivity {
     }
 
     private void sendTokenToBot(String token) {
-        runOnUiThread(() -> tvStatus.setText("✅ Sending token..."));
         new Thread(() -> {
             try {
                 URL url = new URL(botUrl + "/api/config/" + slot);
@@ -127,9 +130,9 @@ public class WebViewActivity extends AppCompatActivity {
                 }
 
                 int code = conn.getResponseCode();
-                runOnUiThread(() -> tvStatus.setText(code == 200 ? "✅ Token saved!" : "❌ Failed"));
+                runOnUiThread(() -> tvStatus.setText(code == 200 ? "✅ تم الحفظ في الموقع!" : "❌ فشل"));
             } catch (Exception e) {
-                runOnUiThread(() -> tvStatus.setText("❌ Error"));
+                runOnUiThread(() -> tvStatus.setText("❌ خطأ في الإرسال"));
             }
         }).start();
     }
