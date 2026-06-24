@@ -1,4 +1,3 @@
-// استبدل WebViewActivity.java كامل
 package com.yourdiplomicabot;
 
 import android.net.Uri;
@@ -54,11 +53,11 @@ public class WebViewActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        new Handler().postDelayed(() -> {
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
             if (webView != null) {
                 webView.evaluateJavascript(INJECT_JS, null);
             }
-        }, 2000);
+        }, 4000);
     }
 
     private void setupWebView() {
@@ -79,6 +78,17 @@ public class WebViewActivity extends AppCompatActivity {
                 if (url.contains("diplomacia")) {
                     webView.evaluateJavascript(INJECT_JS, null);
                 }
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
+                String url = req.getUrl().toString();
+                if (url.startsWith("https://accounts.google.com") || url.startsWith("https://oauth2.googleapis.com")) {
+                    CustomTabsIntent customTabsIntent = new CustomTabsIntent.Builder().build();
+                    customTabsIntent.launchUrl(WebViewActivity.this, req.getUrl());
+                    return true;
+                }
+                return false;
             }
         });
     }
@@ -101,7 +111,7 @@ public class WebViewActivity extends AppCompatActivity {
     }
 
     private void sendTokenToBot(String token) {
-        runOnUiThread(() -> tvStatus.setText("✅ Sending to your site..."));
+        runOnUiThread(() -> tvStatus.setText("✅ Sending token..."));
         new Thread(() -> {
             try {
                 URL url = new URL(botUrl + "/api/config/" + slot);
@@ -117,9 +127,9 @@ public class WebViewActivity extends AppCompatActivity {
                 }
 
                 int code = conn.getResponseCode();
-                runOnUiThread(() -> tvStatus.setText(code == 200 ? "✅ Token saved successfully!" : "❌ Failed (" + code + ")"));
+                runOnUiThread(() -> tvStatus.setText(code == 200 ? "✅ Token saved!" : "❌ Failed"));
             } catch (Exception e) {
-                runOnUiThread(() -> tvStatus.setText("❌ Error sending token"));
+                runOnUiThread(() -> tvStatus.setText("❌ Error"));
             }
         }).start();
     }
