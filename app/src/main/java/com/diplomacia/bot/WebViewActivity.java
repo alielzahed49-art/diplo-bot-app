@@ -15,6 +15,7 @@ import android.webkit.*;
 import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.browser.customtabs.CustomTabsIntent;
 import org.json.JSONObject;
 import java.io.*;
 
@@ -26,23 +27,22 @@ public class WebViewActivity extends AppCompatActivity {
     private String botUrl, sessionToken;
     private int slot;
     private boolean tokenSaved = false;
+    private boolean openedCustomTab = false;
 
+    // JS يحقن في diplomacia بس (مش في Google)
     private static final String INJECT_JS =
         "(function(){" +
         "if(window.__d)return;window.__d=true;" +
-        // Intercept fetch
         "var oF=window.fetch;" +
         "window.fetch=async function(){" +
         "  var r=await oF.apply(this,arguments);" +
         "  try{var c=r.clone();c.text().then(function(t){if(t&&t.length>30)Android.onData(t);});}catch(e){}" +
         "  return r;};" +
-        // Intercept XHR
         "var oS=XMLHttpRequest.prototype.send;" +
         "XMLHttpRequest.prototype.send=function(){" +
         "  this.addEventListener('load',function(){" +
         "    try{if(this.responseText&&this.responseText.length>30)Android.onData(this.responseText);}catch(e){}" +
         "  });return oS.apply(this,arguments);};" +
-        // Check localStorage
         "try{" +
         "  Object.keys(localStorage).forEach(function(k){" +
         "    var v=localStorage.getItem(k);" +
@@ -74,6 +74,42 @@ public class WebViewActivity extends AppCompatActivity {
         webView.loadUrl("https://diplomacia.com.tr");
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // لما اليوزر يرجع بعد Custom Tab، نجيب الكوكيز
+        if (openedCustomTab) {
+            openedCustomTab = false;
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                // نحقن JS في الصفحة الحالية عشان نمسك التوكن
+                webView.evaluateJavascript(INJECT_JS, null);
+                // ونجيب الكوكيز كمان
+                checkCookiesForToken();
+            }, 1500);
+        }
+    }
+
+    private void checkCookiesForToken() {
+        String cookies = CookieManager.getInstance().getCookie("https://diplomacia.com.tr");
+        if (cookies != null) {
+            // دور على JWT في الكوكيز
+            for (String part : cookies.split(";")) {
+                String val = part.trim();
+                int eqIdx = val.indexOf('=');
+                if (eqIdx > 0) val = val.substring(eqIdx + 1).trim();
+                if (val.startsWith("eyJ") && val.length() > 50 && val.contains(".")) {
+                    if (!tokenSaved) {
+                        tokenSaved = true;
+                        sendTokenToBot(val);
+                        return;
+                    }
+                }
+            }
+        }
+        // لو مش في الكوكيز، إعد تحميل الصفحة عشان نمسك التوكن من الـ JS
+        webView.reload();
+    }
+
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     private void setupWebView() {
         WebSettings s = webView.getSettings();
@@ -96,17 +132,32 @@ public class WebViewActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView v, String url) {
                 progressBar.setVisibility(View.GONE);
-                webView.evaluateJavascript(INJECT_JS, null);
+                // نحقن JS بس في diplomacia مش في Google
+                if (url.contains("diplomacia.com.tr")) {
+                    webView.evaluateJavascript(INJECT_JS, null);
+                }
             }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
                 String url = req.getUrl().toString();
-                if (url.startsWith("https://diplomacia.com.tr") ||
-                    url.startsWith("https://accounts.google.com") ||
+                
+                // لو Google OAuth — افتح في Chrome Custom Tab
+                if (url.startsWith("https://accounts.google.com") ||
                     url.startsWith("https://oauth2.googleapis.com")) {
+                    openedCustomTab = true;
+                    tvStatus.setText("سجل دخولك بـ Google في Chrome 👇");
+                    CustomTabsIntent customTabsIntent = new CustomTabsIntent.Builder().build();
+                    customTabsIntent.launchUrl(WebViewActivity.this, req.getUrl());
+                    return true;
+                }
+                
+                // diplomacia يفضل في WebView
+                if (url.startsWith("https://diplomacia.com.tr")) {
                     return false;
                 }
+                
+                // أي حاجة تانية افتحها في المتصفح الخارجي
                 startActivity(new Intent(Intent.ACTION_VIEW, req.getUrl()));
                 return true;
             }
@@ -135,7 +186,6 @@ public class WebViewActivity extends AppCompatActivity {
     private String extractToken(String text) {
         try {
             if (text.trim().startsWith("{") || text.trim().startsWith("[")) {
-                // Find JWT
                 int idx = text.indexOf("eyJ");
                 if (idx >= 0) {
                     int end = text.indexOf("\"", idx);
@@ -143,7 +193,6 @@ public class WebViewActivity extends AppCompatActivity {
                     String t = text.substring(idx, end).trim();
                     if (t.length() > 50 && t.contains(".")) return t;
                 }
-                // Check common fields
                 String[] fields = {"\"token\":\"","\"accessToken\":\"","\"access_token\":\"","\"jwt\":\""};
                 for (String f : fields) {
                     int i = text.indexOf(f);
@@ -156,7 +205,6 @@ public class WebViewActivity extends AppCompatActivity {
                         }
                     }
                 }
-                // Check localStorage value
                 try {
                     JSONObject obj = new JSONObject(text);
                     String v = obj.optString("v", "");
@@ -174,11 +222,10 @@ public class WebViewActivity extends AppCompatActivity {
     }
 
     private void sendTokenToBot(String token) {
-        tvStatus.setText("✅ تم العثور على التوكن! جاري الحفظ...");
+        runOnUiThread(() -> tvStatus.setText("✅ تم العثور على التوكن! جاري الحفظ..."));
 
         new Thread(() -> {
             try {
-                // Send token to bot API
                 URL url = new URL(botUrl + "/api/config/" + slot);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
