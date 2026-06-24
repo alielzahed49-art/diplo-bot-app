@@ -1,10 +1,10 @@
 package com.yourdiplomicabot;
 
+import android.net.Uri;
 import android.webkit.CookieManager;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -25,13 +25,13 @@ public class WebViewActivity extends AppCompatActivity {
     private String botUrl, sessionToken;
     private int slot;
     private boolean tokenSaved = false;
+    private boolean openedCustomTab = false;
 
     private static final String INJECT_JS = 
         "(function(){" +
         "if(window.__d)return;window.__d=true;" +
-        "var token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('jwt') || localStorage.getItem('sessionToken');" +
+        "var token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('jwt');" +
         "if(token) Android.onData(token);" +
-        "var oF=window.fetch;window.fetch=async function(){var r=await oF.apply(this,arguments);try{var c=r.clone();c.text().then(t=>{if(t)Android.onData(t);});}catch(e){}return r;};" +
         "})();";
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
@@ -52,10 +52,13 @@ public class WebViewActivity extends AppCompatActivity {
         webView.loadUrl("https://diplomacia.com.tr");
     }
 
+    @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     private void setupWebView() {
         WebSettings s = webView.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
+        s.setDatabaseEnabled(true);
+        s.setUserAgentString("Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36");
 
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
@@ -64,11 +67,35 @@ public class WebViewActivity extends AppCompatActivity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
+            public void onPageStarted(WebView v, String url, Bitmap fav) {
+                progressBar.setVisibility(View.VISIBLE);
+            }
+
+            @Override
             public void onPageFinished(WebView v, String url) {
                 progressBar.setVisibility(View.GONE);
                 if (url.contains("diplomacia")) {
                     webView.evaluateJavascript(INJECT_JS, null);
                 }
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
+                String url = req.getUrl().toString();
+                
+                if (url.startsWith("https://accounts.google.com") || url.startsWith("https://oauth2.googleapis.com")) {
+                    openedCustomTab = true;
+                    CustomTabsIntent customTabsIntent = new CustomTabsIntent.Builder().build();
+                    customTabsIntent.launchUrl(WebViewActivity.this, req.getUrl());
+                    return true;
+                }
+                
+                if (url.startsWith("https://diplomacia.com.tr")) {
+                    return false;
+                }
+                
+                startActivity(new Intent(Intent.ACTION_VIEW, req.getUrl()));
+                return true;
             }
         });
     }
@@ -76,9 +103,9 @@ public class WebViewActivity extends AppCompatActivity {
     private class JsBridge {
         @JavascriptInterface
         public void onData(String text) {
-            if (tokenSaved || text == null) return;
+            if (tokenSaved || text == null || text.isEmpty()) return;
             String token = extractToken(text);
-            if (token != null && token.length() > 50) {
+            if (token != null) {
                 tokenSaved = true;
                 sendTokenToBot(token);
             }
@@ -86,12 +113,13 @@ public class WebViewActivity extends AppCompatActivity {
     }
 
     private String extractToken(String text) {
-        if (text.startsWith("eyJ")) return text;
-        // Add more extraction logic if needed
+        if (text.trim().startsWith("eyJ") && text.length() > 50) return text.trim();
+        // Add more if needed
         return null;
     }
 
     private void sendTokenToBot(String token) {
+        runOnUiThread(() -> tvStatus.setText("✅ تم استخراج التوكن!"));
         new Thread(() -> {
             try {
                 URL url = new URL(botUrl + "/api/config/" + slot);
@@ -107,9 +135,9 @@ public class WebViewActivity extends AppCompatActivity {
                 }
 
                 int code = conn.getResponseCode();
-                runOnUiThread(() -> tvStatus.setText(code == 200 ? "✅ تم استخراج التوكن!" : "❌ فشل"));
+                runOnUiThread(() -> tvStatus.setText(code == 200 ? "✅ تم الحفظ!" : "❌ فشل"));
             } catch (Exception e) {
-                runOnUiThread(() -> tvStatus.setText("❌ خطأ: " + e.getMessage()));
+                runOnUiThread(() -> tvStatus.setText("❌ خطأ"));
             }
         }).start();
     }
