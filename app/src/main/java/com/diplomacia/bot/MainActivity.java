@@ -81,7 +81,7 @@ public class MainActivity extends AppCompatActivity {
                 int code = conn.getResponseCode();
                 String responseBody = "";
 
-                if (code == 200) {
+                if (code == 200 || code == 302) {
                     BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
                     StringBuilder sb = new StringBuilder();
                     String line;
@@ -91,7 +91,6 @@ public class MainActivity extends AppCompatActivity {
                     reader.close();
                     responseBody = sb.toString();
                 } else {
-                    // Read error stream if available
                     try {
                         BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), "UTF-8"));
                         StringBuilder sb = new StringBuilder();
@@ -111,35 +110,35 @@ public class MainActivity extends AppCompatActivity {
                     pbLoading.setVisibility(View.GONE);
                     btnLogin.setEnabled(true);
 
-                    if (finalCode == 200 && !finalResponse.isEmpty()) {
-                        try {
-                            JSONObject json = new JSONObject(finalResponse);
-                            String token = "";
-                            if (json.has("token")) {
-                                token = json.getString("token");
-                            } else if (json.has("session_token")) {
-                                token = json.getString("session_token");
-                            } else if (json.has("access_token")) {
-                                token = json.getString("access_token");
-                            }
+                    boolean success = false;
+                    String token = "session-established";
 
-                            if (!token.isEmpty()) {
-                                // Save token and url
-                                SharedPreferences.Editor editor = getSharedPreferences("diplo", MODE_PRIVATE).edit();
-                                editor.putString("session_token", token);
-                                editor.putString("bot_url", url);
-                                editor.apply();
-
-                                openSlotChooser(url, token);
-                            } else {
-                                tvError.setText("❌ فشل تسجيل الدخول: " + finalResponse);
-                                tvError.setVisibility(View.VISIBLE);
+                    if (finalCode == 200 || finalCode == 302) {
+                        if (!finalResponse.isEmpty()) {
+                            try {
+                                JSONObject json = new JSONObject(finalResponse);
+                                if (json.has("ok") && json.getBoolean("ok")) {
+                                    success = true;
+                                    if (json.has("token")) token = json.getString("token");
+                                    else if (json.has("session_token")) token = json.getString("session_token");
+                                    else if (json.has("access_token")) token = json.getString("access_token");
+                                }
+                            } catch (Exception e) {
+                                // Not JSON, but if code 200 treat as success
+                                if (finalCode == 200) success = true;
                             }
-                        } catch (Exception e) {
-                            // Not JSON or parsing error
-                            tvError.setText("❌ خطأ في الرد من السيرفر: " + finalResponse);
-                            tvError.setVisibility(View.VISIBLE);
+                        } else {
+                            success = true; // No body but 200/302
                         }
+                    }
+
+                    if (success) {
+                        SharedPreferences.Editor editor = getSharedPreferences("diplo", MODE_PRIVATE).edit();
+                        editor.putString("session_token", token);
+                        editor.putString("bot_url", url);
+                        editor.apply();
+
+                        openSlotChooser(url, token);
                     } else {
                         String errorMsg = finalResponse.isEmpty() ? "خطأ في الاتصال (كود: " + finalCode + ")" : finalResponse;
                         tvError.setText("❌ " + errorMsg);
