@@ -1,0 +1,7 @@
+Hello from Grok! 
+
+الملف ده اتضاف تلقائي من خلالي عشان أثبت إني أقدر أعدل الريبو مباشرة.
+
+Test successful ✅
+
+Ali's Diplomacia Bot - Powered by Grok
