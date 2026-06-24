@@ -4,7 +4,6 @@ import android.net.Uri;
 import android.webkit.CookieManager;
 import android.annotation.SuppressLint;
 import android.content.Intent;
-import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -21,8 +20,8 @@ public class WebViewActivity extends AppCompatActivity {
     private WebView webView;
     private ProgressBar progressBar;
     private TextView tvStatus;
-    private Button btnExtract;
-    private String botUrl, sessionToken;
+    private Button btnGoogleLogin, btnExtract, btnCheck;
+    private String botUrl;
     private int slot;
     private boolean tokenSaved = false;
 
@@ -32,12 +31,11 @@ public class WebViewActivity extends AppCompatActivity {
         "var keys = Object.keys(localStorage);" +
         "for(var i=0;i<keys.length;i++){" +
         "  var k=keys[i]; var v=localStorage.getItem(k);" +
-        "  if(v && v.length>30 && (v.startsWith('eyJ') || k.toLowerCase().includes('token'))) {" +
+        "  if(v && v.length>40 && (v.startsWith('eyJ') || v.includes('Bearer') || k.toLowerCase().includes('token'))){" +
         "    Android.onData(v);" +
         "  }" +
         "}" +
-        "var token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('jwt');" +
-        "if(token) Android.onData(token);" +
+        "if(!window.__found) Android.onData('NO_TOKEN');" +
         "})();";
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
@@ -47,31 +45,37 @@ public class WebViewActivity extends AppCompatActivity {
         setContentView(R.layout.activity_webview);
 
         botUrl = getIntent().getStringExtra("bot_url");
-        sessionToken = getIntent().getStringExtra("session_token");
         slot = getIntent().getIntExtra("slot", 1);
 
         webView = findViewById(R.id.webview);
         progressBar = findViewById(R.id.progress);
         tvStatus = findViewById(R.id.tv_status);
-        btnExtract = findViewById(R.id.btn_extract); // أضف الزرار في الـ layout
+        btnGoogleLogin = findViewById(R.id.btn_google_login);
+        btnExtract = findViewById(R.id.btn_extract);
+        btnCheck = findViewById(R.id.btn_check);
 
-        btnExtract.setOnClickListener(v -> extractTokenManually());
+        btnGoogleLogin.setOnClickListener(v -> startGoogleLogin());
+        btnExtract.setOnClickListener(v -> extractManually());
+        btnCheck.setOnClickListener(v -> checkToken());
 
         setupWebView();
-        webView.loadUrl("https://diplomacia.com.tr");
+        tvStatus.setText("اضغط 'تسجيل بجوجل' (الطريقة الشغالة)");
     }
 
-    private void extractTokenManually() {
-        webView.evaluateJavascript(INJECT_JS, null);
+    private void startGoogleLogin() {
+        String url = "https://diplomacia-saas.onrender.com/auth/google/full/" + slot;
+        CustomTabsIntent customTabsIntent = new CustomTabsIntent.Builder().build();
+        customTabsIntent.launchUrl(this, Uri.parse(url));
+        tvStatus.setText("جاري فتح Google login... بعد الـ login ارجع واضغط 'تحقق'");
+    }
+
+    private void extractManually() {
         tvStatus.setText("جاري استخراج التوكن...");
+        webView.evaluateJavascript(INJECT_JS, null);
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (webView != null) webView.evaluateJavascript(INJECT_JS, null);
-        }, 5000);
+    private void checkToken() {
+        tvStatus.setText("✅ لو التوكن اتحفظ في الموقع → افتح الـ Settings في الموقع");
     }
 
     private void setupWebView() {
@@ -89,9 +93,6 @@ public class WebViewActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView v, String url) {
                 progressBar.setVisibility(View.GONE);
-                if (url.contains("diplomacia")) {
-                    webView.evaluateJavascript(INJECT_JS, null);
-                }
             }
         });
     }
@@ -100,10 +101,14 @@ public class WebViewActivity extends AppCompatActivity {
         @JavascriptInterface
         public void onData(String text) {
             if (tokenSaved) return;
+            if (text.contains("NO_TOKEN")) {
+                runOnUiThread(() -> tvStatus.setText("❌ مفيش توكن (جرب الزرار تاني)"));
+                return;
+            }
             String token = extractToken(text);
             if (token != null) {
                 tokenSaved = true;
-                runOnUiThread(() -> tvStatus.setText("✅ التوكن: " + token.substring(0, 30) + "..."));
+                runOnUiThread(() -> tvStatus.setText("✅ التوكن: " + token.substring(0, 35) + "..."));
                 sendTokenToBot(token);
             }
         }
@@ -111,6 +116,10 @@ public class WebViewActivity extends AppCompatActivity {
 
     private String extractToken(String text) {
         if (text.trim().startsWith("eyJ") && text.length() > 50) return text.trim();
+        if (text.contains("Bearer ")) {
+            int idx = text.indexOf("Bearer ") + 7;
+            return text.substring(idx).trim().split(" ")[0];
+        }
         return null;
     }
 
@@ -122,17 +131,16 @@ public class WebViewActivity extends AppCompatActivity {
                 conn.setRequestMethod("POST");
                 conn.setDoOutput(true);
                 conn.setRequestProperty("Content-Type", "application/json");
-                conn.setRequestProperty("Cookie", "session=" + sessionToken);
+                conn.setRequestProperty("Cookie", "session=" + getIntent().getStringExtra("session_token"));
 
                 String body = "{\"token\":\"" + token + "\"}";
                 try (OutputStream os = conn.getOutputStream()) {
                     os.write(body.getBytes("UTF-8"));
                 }
-
                 int code = conn.getResponseCode();
                 runOnUiThread(() -> tvStatus.setText(code == 200 ? "✅ تم الحفظ في الموقع!" : "❌ فشل"));
             } catch (Exception e) {
-                runOnUiThread(() -> tvStatus.setText("❌ خطأ في الإرسال"));
+                runOnUiThread(() -> tvStatus.setText("❌ خطأ"));
             }
         }).start();
     }
