@@ -41,11 +41,21 @@
             android:textSize="12sp"
             android:gravity="center"
             android:layout_marginTop="4dp"/>
+
+        <!-- الزرار الجديد -->
+        <Button
+            android:id="@+id/btn_extract"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="استخرج التوكن يدوي"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#C8A84B"
+            android:layout_marginTop="10dp"
+            android:padding="12dp"/>
     </LinearLayout>
 
     <WebView
         android:id="@+id/webview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
-
 </LinearLayout>
