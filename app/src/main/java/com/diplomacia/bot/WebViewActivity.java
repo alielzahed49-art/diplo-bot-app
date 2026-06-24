@@ -25,13 +25,13 @@ public class WebViewActivity extends AppCompatActivity {
     private String botUrl, sessionToken;
     private int slot;
     private boolean tokenSaved = false;
-    private boolean openedCustomTab = false;
 
     private static final String INJECT_JS = 
         "(function(){" +
         "if(window.__d)return;window.__d=true;" +
+        "var keys = Object.keys(localStorage); for(var i=0;i<keys.length;i++){var k=keys[i];var v=localStorage.getItem(k);if(v&&v.length>30)Android.onData(v);}" +
         "var token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('jwt');" +
-        "if(token) Android.onData(token);" +
+        "if(token) Android.onData(token); else Android.onData('NO_TOKEN_FOUND');" +
         "})();";
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
@@ -52,12 +52,10 @@ public class WebViewActivity extends AppCompatActivity {
         webView.loadUrl("https://diplomacia.com.tr");
     }
 
-    @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     private void setupWebView() {
         WebSettings s = webView.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
-        s.setDatabaseEnabled(true);
         s.setUserAgentString("Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36");
 
         CookieManager.getInstance().setAcceptCookie(true);
@@ -67,35 +65,11 @@ public class WebViewActivity extends AppCompatActivity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
-            public void onPageStarted(WebView v, String url, Bitmap fav) {
-                progressBar.setVisibility(View.VISIBLE);
-            }
-
-            @Override
             public void onPageFinished(WebView v, String url) {
                 progressBar.setVisibility(View.GONE);
                 if (url.contains("diplomacia")) {
                     webView.evaluateJavascript(INJECT_JS, null);
                 }
-            }
-
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
-                String url = req.getUrl().toString();
-                
-                if (url.startsWith("https://accounts.google.com") || url.startsWith("https://oauth2.googleapis.com")) {
-                    openedCustomTab = true;
-                    CustomTabsIntent customTabsIntent = new CustomTabsIntent.Builder().build();
-                    customTabsIntent.launchUrl(WebViewActivity.this, req.getUrl());
-                    return true;
-                }
-                
-                if (url.startsWith("https://diplomacia.com.tr")) {
-                    return false;
-                }
-                
-                startActivity(new Intent(Intent.ACTION_VIEW, req.getUrl()));
-                return true;
             }
         });
     }
@@ -103,7 +77,9 @@ public class WebViewActivity extends AppCompatActivity {
     private class JsBridge {
         @JavascriptInterface
         public void onData(String text) {
-            if (tokenSaved || text == null || text.isEmpty()) return;
+            if (tokenSaved) return;
+            runOnUiThread(() -> tvStatus.setText("Received: " + text.substring(0, Math.min(50, text.length())) + "..."));
+            if (text.contains("NO_TOKEN_FOUND")) return;
             String token = extractToken(text);
             if (token != null) {
                 tokenSaved = true;
@@ -114,12 +90,11 @@ public class WebViewActivity extends AppCompatActivity {
 
     private String extractToken(String text) {
         if (text.trim().startsWith("eyJ") && text.length() > 50) return text.trim();
-        // Add more if needed
         return null;
     }
 
     private void sendTokenToBot(String token) {
-        runOnUiThread(() -> tvStatus.setText("✅ تم استخراج التوكن!"));
+        runOnUiThread(() -> tvStatus.setText("✅ Sending to site..."));
         new Thread(() -> {
             try {
                 URL url = new URL(botUrl + "/api/config/" + slot);
@@ -135,9 +110,9 @@ public class WebViewActivity extends AppCompatActivity {
                 }
 
                 int code = conn.getResponseCode();
-                runOnUiThread(() -> tvStatus.setText(code == 200 ? "✅ تم الحفظ!" : "❌ فشل"));
+                runOnUiThread(() -> tvStatus.setText(code == 200 ? "✅ Token saved on site!" : "❌ Failed (" + code + ")"));
             } catch (Exception e) {
-                runOnUiThread(() -> tvStatus.setText("❌ خطأ"));
+                runOnUiThread(() -> tvStatus.setText("❌ Error sending: " + e.getMessage()));
             }
         }).start();
     }
