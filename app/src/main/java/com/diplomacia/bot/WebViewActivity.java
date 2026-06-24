@@ -1,4 +1,4 @@
-// WebViewActivity.java كامل (استبدل كله)
+// استبدل WebViewActivity.java كامل
 package com.yourdiplomicabot;
 
 import android.net.Uri;
@@ -51,6 +51,16 @@ public class WebViewActivity extends AppCompatActivity {
         webView.loadUrl("https://diplomacia.com.tr");
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        new Handler().postDelayed(() -> {
+            if (webView != null) {
+                webView.evaluateJavascript(INJECT_JS, null);
+            }
+        }, 2000);
+    }
+
     private void setupWebView() {
         WebSettings s = webView.getSettings();
         s.setJavaScriptEnabled(true);
@@ -91,7 +101,7 @@ public class WebViewActivity extends AppCompatActivity {
     }
 
     private void sendTokenToBot(String token) {
-        runOnUiThread(() -> tvStatus.setText("✅ Sending token to site..."));
+        runOnUiThread(() -> tvStatus.setText("✅ Sending to your site..."));
         new Thread(() -> {
             try {
                 URL url = new URL(botUrl + "/api/config/" + slot);
@@ -107,9 +117,9 @@ public class WebViewActivity extends AppCompatActivity {
                 }
 
                 int code = conn.getResponseCode();
-                runOnUiThread(() -> tvStatus.setText(code == 200 ? "✅ Token saved!" : "❌ Failed"));
+                runOnUiThread(() -> tvStatus.setText(code == 200 ? "✅ Token saved successfully!" : "❌ Failed (" + code + ")"));
             } catch (Exception e) {
-                runOnUiThread(() -> tvStatus.setText("❌ Error"));
+                runOnUiThread(() -> tvStatus.setText("❌ Error sending token"));
             }
         }).start();
     }
