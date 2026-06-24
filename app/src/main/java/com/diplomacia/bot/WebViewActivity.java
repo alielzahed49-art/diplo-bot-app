@@ -1,7 +1,5 @@
 package com.yourdiplomicabot;
 
-import android.net.Uri;
-import android.webkit.CookieManager;
 import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.os.Handler;
@@ -10,7 +8,6 @@ import android.view.View;
 import android.webkit.*;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.browser.customtabs.CustomTabsIntent;
 import java.net.*;
 import java.io.*;
 
@@ -92,18 +89,14 @@ public class WebViewActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
-                String url = req.getUrl().toString();
-                if (url.startsWith("https://accounts.google.com") || url.startsWith("https://oauth2.googleapis.com")) {
-                    CustomTabsIntent customTabsIntent = new CustomTabsIntent.Builder().build();
-                    customTabsIntent.launchUrl(WebViewActivity.this, req.getUrl());
-                    return true;
-                }
+                // Let everything load inside the WebView (including Google login)
                 return false;
             }
 
             @Override
             public void onPageFinished(WebView v, String url) {
                 progressBar.setVisibility(View.GONE);
+                // Try to extract token automatically after page loads
                 webView.evaluateJavascript(INJECT_JS, null);
             }
         });
