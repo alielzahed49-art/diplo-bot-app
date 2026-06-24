@@ -7,8 +7,9 @@ import android.os.Handler;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
-import java.net.*;
+import org.json.JSONObject;
 import java.io.*;
+import java.net.*;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -33,7 +34,6 @@ public class MainActivity extends AppCompatActivity {
         String savedUrl = prefs.getString("bot_url", "https://diplomacia-saas.onrender.com");
         etUrl.setText(savedUrl);
 
-        // Auto fill for testing
         etUsername.setText("12");
         etPassword.setText("12");
 
@@ -45,10 +45,19 @@ public class MainActivity extends AppCompatActivity {
 
         btnLogin.setOnClickListener(v -> doLogin());
 
-        // Auto login after fill
         new Handler().postDelayed(this::doLogin, 1000);
     }
 
-    // باقي الـ doLogin والـ openSlotChooser زي ما هم (مش محتاج تغيير)
-    // ... (انسخ الباقي من الملف القديم)
+    private void doLogin() {
+        // (انسخ الـ doLogin كامل من الملف القديم بتاعك)
+        // ... 
+    }
+
+    private void openSlotChooser(String url, String token) {
+        Intent i = new Intent(this, SlotActivity.class);
+        i.putExtra("bot_url", url);
+        i.putExtra("session_token", token);
+        startActivity(i);
+        finish();
+    }
 }
