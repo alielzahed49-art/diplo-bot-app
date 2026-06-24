@@ -5,21 +5,22 @@
     android:orientation="vertical"
     android:background="#07071A">
 
+    <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#1A1A2E"
         android:orientation="vertical"
-        android:padding="10dp">
+        android:padding="12dp">
 
         <TextView
             android:id="@+id/tv_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="استخراج التوكن"
+            android:text="استخراج التوكن - Diplomacia"
             android:textColor="#C8A84B"
             android:textStyle="bold"
-            android:textSize="14sp"
+            android:textSize="15sp"
             android:gravity="center"/>
 
         <ProgressBar
@@ -27,7 +28,7 @@
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
             android:layout_height="3dp"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:max="100"
             android:progressTint="#C8A84B"
             android:visibility="gone"/>
@@ -36,26 +37,55 @@
             android:id="@+id/tv_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="سجل دخولك بـ Google 👇"
+            android:text="اضغط 'تسجيل بجوجل' (الطريقة الشغالة)"
             android:textColor="#AAAACC"
             android:textSize="12sp"
             android:gravity="center"
-            android:layout_marginTop="4dp"/>
+            android:layout_marginTop="6dp"/>
+    </LinearLayout>
 
-        <!-- الزرار الجديد -->
+    <!-- الأزرار -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <Button
+            android:id="@+id/btn_google_login"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="تسجيل بجوجل (الطريقة الشغالة)"
+            android:textColor="#000000"
+            android:backgroundTint="#C8A84B"
+            android:padding="14dp"
+            android:layout_marginBottom="10dp"/>
+
         <Button
             android:id="@+id/btn_extract"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="استخرج التوكن يدوي"
+            android:text="استخرج التوكن يدوي (Backup)"
             android:textColor="#FFFFFF"
-            android:backgroundTint="#C8A84B"
-            android:layout_marginTop="10dp"
+            android:backgroundTint="#4A4A6A"
+            android:padding="12dp"
+            android:layout_marginBottom="10dp"/>
+
+        <Button
+            android:id="@+id/btn_check"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="تحقق من حفظ التوكن"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#2E5A3E"
             android:padding="12dp"/>
     </LinearLayout>
 
+    <!-- WebView -->
     <WebView
         android:id="@+id/webview"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_margin="8dp"/>
 </LinearLayout>
