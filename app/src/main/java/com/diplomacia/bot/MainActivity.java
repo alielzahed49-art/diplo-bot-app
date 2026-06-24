@@ -9,6 +9,7 @@ import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import java.io.*;
 import java.net.*;
+import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -78,15 +79,72 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 int code = conn.getResponseCode();
+                String responseBody = "";
 
-                // Read response (add your original response handling here)
-                // For now, assume success and use saved token logic
+                if (code == 200) {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    reader.close();
+                    responseBody = sb.toString();
+                } else {
+                    // Read error stream if available
+                    try {
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), "UTF-8"));
+                        StringBuilder sb = new StringBuilder();
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            sb.append(line);
+                        }
+                        reader.close();
+                        responseBody = sb.toString();
+                    } catch (Exception ignored) {}
+                }
+
+                final String finalResponse = responseBody;
+                final int finalCode = code;
 
                 runOnUiThread(() -> {
                     pbLoading.setVisibility(View.GONE);
                     btnLogin.setEnabled(true);
-                    // If success:
-                    openSlotChooser(url, "dummy-token"); // Replace with real token
+
+                    if (finalCode == 200 && !finalResponse.isEmpty()) {
+                        try {
+                            JSONObject json = new JSONObject(finalResponse);
+                            String token = "";
+                            if (json.has("token")) {
+                                token = json.getString("token");
+                            } else if (json.has("session_token")) {
+                                token = json.getString("session_token");
+                            } else if (json.has("access_token")) {
+                                token = json.getString("access_token");
+                            }
+
+                            if (!token.isEmpty()) {
+                                // Save token and url
+                                SharedPreferences.Editor editor = getSharedPreferences("diplo", MODE_PRIVATE).edit();
+                                editor.putString("session_token", token);
+                                editor.putString("bot_url", url);
+                                editor.apply();
+
+                                openSlotChooser(url, token);
+                            } else {
+                                tvError.setText("❌ فشل تسجيل الدخول: " + finalResponse);
+                                tvError.setVisibility(View.VISIBLE);
+                            }
+                        } catch (Exception e) {
+                            // Not JSON or parsing error
+                            tvError.setText("❌ خطأ في الرد من السيرفر: " + finalResponse);
+                            tvError.setVisibility(View.VISIBLE);
+                        }
+                    } else {
+                        String errorMsg = finalResponse.isEmpty() ? "خطأ في الاتصال (كود: " + finalCode + ")" : finalResponse;
+                        tvError.setText("❌ " + errorMsg);
+                        tvError.setVisibility(View.VISIBLE);
+                    }
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
