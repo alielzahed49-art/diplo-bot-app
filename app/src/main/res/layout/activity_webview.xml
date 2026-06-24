@@ -42,6 +42,18 @@
             android:textSize="13sp"
             android:gravity="center"
             android:layout_marginTop="8dp"/>
+
+        <TextView
+            android:id="@+id/tv_token"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="التوكن: ---"
+            android:textColor="#C8A84B"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:layout_marginTop="6dp"
+            android:ellipsize="end"
+            android:maxLines="2"/>
     </LinearLayout>
 
     <!-- الأزرار -->
@@ -70,16 +82,6 @@
             android:textColor="#FFFFFF"
             android:backgroundTint="#4A4A6A"
             android:padding="14dp"/>
-
-        <Button
-            android:id="@+id/btn_force_scan"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="فحص قسري للتوكن"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#3A3A5A"
-            android:padding="12dp"
-            android:layout_marginTop="8dp"/>
     </LinearLayout>
 
     <!-- WebView -->
