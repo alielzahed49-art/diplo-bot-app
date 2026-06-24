@@ -18,52 +18,23 @@ public class WebViewActivity extends AppCompatActivity {
 
     private WebView webView;
     private ProgressBar progressBar;
-    private TextView tvStatus;
-    private Button btnStart, btnExtract, btnForceScan;
+    private TextView tvStatus, tvToken;
+    private Button btnStart, btnExtract;
     private String botUrl;
     private int slot;
     private boolean tokenSaved = false;
 
-    private static final String INJECT_JS = 
-        "(function(){" +
-        "  if (window.__tokenExtractorRunning) return;" +
-        "  window.__tokenExtractorRunning = true;" +
-        "  function findTokens() {" +
-        "    let candidates = [];" +
-        "    // Check localStorage" +
-        "    for (let i = 0; i < localStorage.length; i++) {" +
-        "      let key = localStorage.key(i);" +
-        "      let val = localStorage.getItem(key);" +
-        "      if (val && val.length > 30) {" +
-        "        let k = key.toLowerCase();" +
-        "        if (val.startsWith('eyJ') || val.includes('Bearer') || " +
-        "            k.includes('token') || k.includes('auth') || k.includes('jwt') || k.includes('session') || " +
-        "            val.length > 80) {" +
-        "          candidates.push({key: key, value: val});" +
-        "        }" +
-        "      }" +
-        "    }" +
-        "    // Check sessionStorage" +
-        "    for (let i = 0; i < sessionStorage.length; i++) {" +
-        "      let key = sessionStorage.key(i);" +
-        "      let val = sessionStorage.getItem(key);" +
-        "      if (val && val.length > 30) {" +
-        "        let k = key.toLowerCase();" +
-        "        if (val.startsWith('eyJ') || val.includes('Bearer') || " +
-        "            k.includes('token') || k.includes('auth') || k.includes('jwt')) {" +
-        "          candidates.push({key: key, value: val});" +
-        "        }" +
-        "      }" +
-        "    }" +
-        "    if (candidates.length > 0) {" +
-        "      // Pick the longest/most promising" +
-        "      candidates.sort((a, b) => b.value.length - a.value.length);" +
-        "      let best = candidates[0];" +
-        "      Android.onData(best.value + '||KEY:' + best.key);" +
-        "    }" +
-        "  }" +
-        "  findTokens();" +
-        "  setInterval(findTokens, 2500);" +
+    private static final String INJECT_JS =
+        "(function() { " +
+        "  var keys = Object.keys(localStorage); " +
+        "  for (var i = 0; i < keys.length; i++) { " +
+        "    var k = keys[i]; " +
+        "    var v = localStorage.getItem(k); " +
+        "    if (v && v.length > 40 && (v.startsWith('eyJ') || v.includes('Bearer') || k.toLowerCase().includes('token') || k.toLowerCase().includes('auth'))) { " +
+        "      Android.onData(v); " +
+        "      break; " +
+        "    } " +
+        "  } " +
         "})();";
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
@@ -78,16 +49,15 @@ public class WebViewActivity extends AppCompatActivity {
         webView = findViewById(R.id.webview);
         progressBar = findViewById(R.id.progress);
         tvStatus = findViewById(R.id.tv_status);
+        tvToken = findViewById(R.id.tv_token);
         btnStart = findViewById(R.id.btn_start);
         btnExtract = findViewById(R.id.btn_extract);
-        btnForceScan = findViewById(R.id.btn_force_scan);
 
         btnStart.setOnClickListener(v -> startGame());
         btnExtract.setOnClickListener(v -> extractTokenManually());
-        btnForceScan.setOnClickListener(v -> forceScan());
 
         setupWebView();
-        tvStatus.setText("اضغط 'ابدأ' عشان يفتح اللعبة\nالتوكن هيتسحب تلقائي لما تسجل دخول");
+        tvStatus.setText("اضغط 'ابدأ' عشان يفتح اللعبة\nالتوكن هيتسحب تلقائي");
     }
 
     private void startGame() {
@@ -96,16 +66,8 @@ public class WebViewActivity extends AppCompatActivity {
     }
 
     private void extractTokenManually() {
-        tvStatus.setText("جاري البحث عن التوكن...");
+        tvStatus.setText("جاري استخراج التوكن...");
         webView.evaluateJavascript(INJECT_JS, null);
-    }
-
-    private void forceScan() {
-        tvStatus.setText("جاري الفحص القسري...");
-        webView.evaluateJavascript(INJECT_JS, null);
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (!tokenSaved) tvStatus.setText("لم يتم العثور على توكن بعد. جرب تسجيل الدخول في اللعبة");
-        }, 3000);
     }
 
     @Override
@@ -113,14 +75,14 @@ public class WebViewActivity extends AppCompatActivity {
         super.onResume();
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             if (webView != null) webView.evaluateJavascript(INJECT_JS, null);
-        }, 2000);
+        }, 3000);
     }
 
     private void setupWebView() {
         WebSettings s = webView.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
-        s.setUserAgentString("Mozilla/5.0 (Linux; Android 13) AppleKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36");
+        s.setUserAgentString("Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36");
 
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
@@ -142,9 +104,7 @@ public class WebViewActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView v, String url) {
                 progressBar.setVisibility(View.GONE);
-                if (url.contains("diplomacia") || url.contains("game") || url.contains("play")) {
-                    webView.evaluateJavascript(INJECT_JS, null);
-                }
+                webView.evaluateJavascript(INJECT_JS, null);
             }
         });
     }
@@ -158,7 +118,8 @@ public class WebViewActivity extends AppCompatActivity {
                 tokenSaved = true;
                 final String finalToken = token;
                 runOnUiThread(() -> {
-                    tvStatus.setText("✅ تم سحب التوكن! جاري الإرسال للبوت...\n" + finalToken.substring(0, Math.min(30, finalToken.length())) + "...");
+                    tvStatus.setText("✅ تم سحب التوكن!");
+                    if (tvToken != null) tvToken.setText(finalToken);
                 });
                 sendTokenToBot(finalToken);
             }
@@ -168,34 +129,10 @@ public class WebViewActivity extends AppCompatActivity {
     private String extractToken(String text) {
         if (text == null) return null;
         text = text.trim();
-
-        // If it contains ||KEY: it came from improved JS
-        if (text.contains("||KEY:")) {
-            String[] parts = text.split("\\|\|KEY:");
-            if (parts.length > 0) {
-                String val = parts[0].trim();
-                if (val.startsWith("eyJ") && val.length() > 50) return val;
-                if (val.length() > 40) return val;
-            }
-        }
-
         if (text.startsWith("eyJ") && text.length() > 50) return text;
         if (text.contains("Bearer ")) {
             int idx = text.indexOf("Bearer ") + 7;
-            String t = text.substring(idx).trim().split(" ")[0];
-            if (t.length() > 20) return t;
-        }
-        // Try to find JWT-like in the string
-        if (text.contains("eyJ")) {
-            int start = text.indexOf("eyJ");
-            int end = text.indexOf(".", start + 10);
-            if (end > start) {
-                String possible = text.substring(start, Math.min(end + 100, text.length()));
-                if (possible.length() > 50) return possible.split("\n")[0].trim();
-            }
-        }
-        if (text.length() > 60 && (text.contains("token") || text.contains("auth"))) {
-            return text;
+            return text.substring(idx).trim().split(" ")[0];
         }
         return null;
     }
@@ -221,14 +158,14 @@ public class WebViewActivity extends AppCompatActivity {
                 int code = conn.getResponseCode();
                 runOnUiThread(() -> {
                     if (code == 200 || code == 201) {
-                        tvStatus.setText("✅ تم الحفظ بنجاح في البوت!\nالتوكن: " + token.substring(0, Math.min(25, token.length())) + "...");
-                        new Handler().postDelayed(() -> finish(), 2500);
+                        tvStatus.setText("✅ تم الحفظ في البوت بنجاح!");
+                        new Handler().postDelayed(() -> finish(), 2000);
                     } else {
-                        tvStatus.setText("❌ فشل الإرسال (كود: " + code + ")");
+                        tvStatus.setText("❌ فشل الإرسال");
                     }
                 });
             } catch (Exception e) {
-                runOnUiThread(() -> tvStatus.setText("❌ خطأ في الإرسال: " + e.getMessage()));
+                runOnUiThread(() -> tvStatus.setText("❌ خطأ"));
             }
         }).start();
     }
